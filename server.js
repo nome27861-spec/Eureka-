@@ -1,6 +1,6 @@
 const http = require('http');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, setDoc, collection, addDoc, query, where, limit, getDocs, updateDoc, orderBy } = require('firebase/firestore');
+const { getFirestore, doc, setDoc, collection, addDoc, query, where, limit, getDocs, updateDoc } = require('firebase/firestore');
 
 const firebaseConfig = {
   apiKey: "AIzaSyBSgm4PB9FffpqUVEoNU4QgtCxnWCUUBL4",
@@ -19,7 +19,6 @@ const server = http.createServer(async (req, res) => {
     if (req.url === '/' || req.url === '') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         
-        // INTERFACE WEB ATUALIZADA COM MONITOR EM TEMPO REAL
         const html = `
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -28,14 +27,14 @@ const server = http.createServer(async (req, res) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Eureka Core</title>
             <style>
-                body { margin: 0; padding: 0; background-color: #0b0b14; color: #fff; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; justify-content: center; overflow-x: hidden; position: relative; }
+                body { margin: 0; padding: 0; background-color: #0b0b14; color: #fff; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; justify-content: center; overflow-x: hidden; position: relative; padding-bottom: 30px; }
                 .menu-buger { position: fixed; top: 15px; left: 15px; cursor: pointer; z-index: 100; background: #6c5ce7; padding: 12px; border-radius: 12px; box-shadow: 0 4px 15px rgba(108, 92, 231, 0.4); display: flex; flex-direction: column; gap: 4px; }
                 .menu-buger div { width: 22px; height: 3px; background-color: #fff; border-radius: 2px; }
                 .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #0f0f1f; border-right: 1px solid #23233c; transition: 0.3s; z-index: 99; padding-top: 80px; box-sizing: border-box; }
                 .sidebar.open { left: 0; box-shadow: 10px 0 30px rgba(0,0,0,0.7); }
                 .menu-item { padding: 18px 25px; color: #8f8fa8; cursor: pointer; font-weight: 500; display: flex; align-items: center; transition: 0.2s; border-left: 4px solid transparent; font-size: 0.95rem; }
                 .menu-item:hover, .menu-item.active { background: #1a1a30; color: #fff; border-left-color: #6c5ce7; }
-                .card { background: #131324; padding: 25px; border-radius: 20px; width: 90%; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #23233c; text-align: center; box-sizing: border-box; display: block; margin-top: 40px; }
+                .card { background: #131324; padding: 25px; border-radius: 20px; width: 92%; max-width: 440px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #23233c; text-align: center; box-sizing: border-box; display: block; margin-top: 60px; }
                 h1 { color: #6c5ce7; font-size: 2.2rem; margin: 0 0 5px 0; letter-spacing: 3px; }
                 .subtitle { color: #8f8fa8; font-size: 0.85rem; margin-bottom: 25px; }
                 .power-btn { width: 100px; height: 100px; border-radius: 50%; border: none; background: #ff7675; color: white; font-weight: bold; font-size: 1.1rem; cursor: pointer; box-shadow: 0 0 20px rgba(255, 118, 117, 0.4); transition: 0.3s; margin-bottom: 25px; outline: none; }
@@ -52,12 +51,14 @@ const server = http.createServer(async (req, res) => {
                 input:checked + .slider { background-color: #6c5ce7; }
                 input:checked + .slider:before { transform: translateX(22px); }
                 .beta-warning { background: rgba(225, 112, 85, 0.1); border: 1px solid rgba(225, 112, 85, 0.3); padding: 12px; border-radius: 10px; font-size: 0.75rem; color: #fab1a0; text-align: left; line-height: 1.4; margin-top: 15px; display: none; }
-                .sub-panel { background: #131324; padding: 25px; border-radius: 20px; width: 90%; max-width: 420px; border: 1px solid #23233c; box-shadow: 0 10px 30px rgba(0,0,0,0.5); box-sizing: border-box; display: none; margin-top: 40px; }
+                
+                /* CORREÇÃO DO LAYOUT DOS PAINÉIS */
+                .sub-panel { background: #131324; padding: 25px; border-radius: 20px; width: 92%; max-width: 440px; border: 1px solid #23233c; box-shadow: 0 10px 30px rgba(0,0,0,0.5); box-sizing: border-box; display: none; margin-top: 60px; }
                 .panel-title { color: #6c5ce7; font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; text-align: center; }
-                .btn-action { background: #6c5ce7; border: none; color: white; padding: 14px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 1rem; }
+                .btn-action { background: #6c5ce7; border: none; color: white; padding: 14px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 1rem; margin-bottom: 15px; }
                 .terminal { background: #000; font-family: monospace; padding: 12px; border-radius: 8px; font-size: 0.8rem; color: #00ff00; height: 140px; overflow-y: auto; text-align: left; margin-top: 15px; border: 1px solid #23233c; line-height: 1.4; }
-                .text-input-mesh { width: 100%; background: #1a1a30; border: 1px solid #3f3f5f; border-radius: 12px; padding: 12px; color: white; box-sizing: border-box; resize: none; min-height: 80px; outline: none; margin-bottom: 10px; }
-                .chat-box { background: #1a1a30; height: 200px; overflow-y: auto; border-radius: 12px; padding: 12px; font-size: 0.9rem; text-align: left; display: flex; flex-direction: column; gap: 10px; border: 1px solid #23233c; }
+                .text-input-mesh { width: 100%; background: #1a1a30; border: 1px solid #3f3f5f; border-radius: 12px; padding: 12px; color: white; box-sizing: border-box; resize: none; min-height: 80px; outline: none; margin-bottom: 5px; }
+                .chat-box { background: #1a1a30; height: 220px; overflow-y: auto; border-radius: 12px; padding: 12px; font-size: 0.9rem; text-align: left; display: flex; flex-direction: column; gap: 10px; border: 1px solid #23233c; }
                 .msg { padding: 10px 14px; border-radius: 12px; max-width: 85%; line-height: 1.4; }
                 .msg.user { background: #6c5ce7; align-self: flex-end; }
                 .msg.ia { background: #23233c; align-self: flex-start; color: #a29bfe; }
@@ -66,13 +67,13 @@ const server = http.createServer(async (req, res) => {
                 .chat-input-container button { background: #6c5ce7; border: none; color: white; padding: 0 18px; border-radius: 10px; cursor: pointer; font-weight: bold; }
                 .node-info-text { color: #636e72; font-size: 0.75rem; font-family: monospace; margin-top: 15px; }
                 
-                /* ESTILOS DO MONITOR DE BLOCOS */
-                .monitor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin-top: 15px; background: #0b0b14; padding: 10px; border-radius: 8px; border: 1px solid #23233c; }
-                .bloco-status { padding: 6px; font-size: 0.75rem; font-family: monospace; border-radius: 4px; text-align: center; font-weight: bold; }
-                .bloco-status.Pendente { background: #3f3f5f; color: #fff; }
+                /* CORREÇÃO DO MONITOR DE TRABALHO */
+                .monitor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(65px, 1fr)); gap: 8px; margin-top: 8px; margin-bottom: 8px; background: #0b0b14; padding: 12px; border-radius: 8px; border: 1px solid #23233c; max-height: 120px; overflow-y: auto; }
+                .bloco-status { padding: 6px; font-size: 0.7rem; font-family: monospace; border-radius: 4px; text-align: center; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+                .bloco-status.Pendente { background: #2d2d44; color: #a29bfe; border: 1px solid #3f3f5f; }
                 .bloco-status.Em { background: #f1c40f; color: #000; }
                 .bloco-status.Concluído { background: #00b894; color: #fff; }
-                .resultado-box { margin-top: 15px; background: #1a1a30; padding: 12px; border-radius: 10px; text-align: left; font-size: 0.9rem; border: 1px solid #6c5ce7; display: none; }
+                .resultado-box { margin-top: 15px; background: #1a1a30; padding: 14px; border-radius: 12px; text-align: left; font-size: 0.9rem; border: 2px solid #00b894; display: none; box-shadow: 0 0 15px rgba(0, 184, 148, 0.2); }
             </style>
         </head>
         <body>
@@ -112,14 +113,14 @@ const server = http.createServer(async (req, res) => {
                 <textarea id="meshFileInput" class="text-input-mesh" placeholder="Digite ou cole uma string de dados pesada para processar de forma distribuída..."></textarea>
                 <button class="btn-action" onclick="processarArquivoNaMalha()">Fatiar e Processar na Rede</button>
                 
-                <div style="margin-top: 15px; text-align: left; font-size: 0.85rem; color: #8f8fa8;">Status da Malha de Trabalho:</div>
+                <div style="margin-top: 10px; text-align: left; font-size: 0.85rem; color: #8f8fa8; font-weight: bold; letter-spacing: 0.5px;">MALHA DE TRABALHO:</div>
                 <div id="monitorBlocos" class="monitor-grid">
-                    <div style="color:#636e72; grid-column: 1/-1; font-size:0.75rem;">Nenhum arquivo na fila de fragmentação.</div>
+                    <div style="color:#636e72; grid-column: 1/-1; font-size:0.75rem; padding: 5px 0;">Nenhum bloco na fila de processamento.</div>
                 </div>
 
                 <div id="boxResultadoFinal" class="resultado-box">
                     <strong style="color: #00b894;">📦 ARQUIVO RECONSTRUÍDO:</strong>
-                    <p id="textoResultadoFinal" style="margin: 5px 0 0 0; word-break: break-all; font-family: monospace;"></p>
+                    <p id="textoResultadoFinal" style="margin: 8px 0 0 0; word-break: break-all; font-family: monospace; background: #0b0b14; padding: 8px; border-radius: 6px; color: #00ff00; border: 1px solid #23233c; font-size: 0.85rem;"></p>
                 </div>
 
                 <div id="termArquivos" class="terminal">> Fila vazia. Pronto para fragmentação...</div>
@@ -212,8 +213,7 @@ const server = http.createServer(async (req, res) => {
                     }
                 }
 
-                // LOOP VISUAL: Fica perguntando pro servidor como está o andamento das fatias
-                function activarLoopMonitor() {
+                function ativarLoopMonitor() {
                     setInterval(async () => {
                         try {
                             const res = await fetch('/checar-fila');
@@ -223,11 +223,10 @@ const server = http.createServer(async (req, res) => {
                                 let htmlGrid = '';
                                 dados.lista.forEach(b => {
                                     let labelStatus = b.status === 'Em Processamento' ? 'Em Proc.' : b.status;
-                                    htmlGrid += \`<div class="bloco-status \${b.status}">B\${b.index}<br><span style="font-size:9px;">\${labelStatus}</span></div>\`;
+                                    htmlGrid += \`<div class="bloco-status \${b.status}">B\${b.index}<br><span style="font-size:8px;">\${labelStatus}</span></div>\`;
                                 });
                                 document.getElementById('monitorBlocos').innerHTML = htmlGrid;
 
-                                // Se tudo foi concluído, mostra o texto unificado
                                 if(dados.tudoConcluido && dados.textoCompleto) {
                                     document.getElementById('textoResultadoFinal').innerText = dados.textoCompleto;
                                     document.getElementById('boxResultadoFinal').style.display = 'block';
@@ -349,7 +348,6 @@ const server = http.createServer(async (req, res) => {
         }
 
     } else if (req.url.startsWith('/checar-fila')) {
-        // ROTA NOVA: Coleta todos os blocos do Firebase, ordena por índice e verifica se terminou tudo
         res.writeHead(200, { 'Content-Type': 'application/json' });
         try {
             const filaRef = collection(db, "fila_computacao");
@@ -365,7 +363,6 @@ const server = http.createServer(async (req, res) => {
                 });
             });
 
-            // Ordena os blocos pelo índice correto (0, 1, 2...)
             blocos.sort((a, b) => a.index - b.index);
 
             let tudoConcluido = blocos.length > 0 && blocos.every(b => b.status === "Concluído");
