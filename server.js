@@ -19,7 +19,7 @@ const server = http.createServer(async (req, res) => {
     if (req.url === '/' || req.url === '') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         
-        // Interface Web Principal
+        // Interface Web Atualizada com comunicação dinâmica de chat P2P
         const html = `
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -98,16 +98,23 @@ const server = http.createServer(async (req, res) => {
                 <button class="btn-action" onclick="rodarOtimizador()">Otimizar Aparelho Agora</button>
                 <div id="termOtimizar" class="terminal">> Aguardando...</div>
             </div>
+            
             <div id="tela-arquivos" class="sub-panel">
                 <div class="panel-title">📁 Supercomputador Mesh</div>
                 <div class="drop-zone">📥<br>Selecionar arquivo</div>
                 <button class="btn-action" onclick="simularProcessamento()">Processar na Rede</button>
                 <div id="termArquivos" class="terminal">> Fila vazia...</div>
             </div>
+
             <div id="tela-chat" class="sub-panel">
                 <div class="panel-title">🤖 Eureka IA (P2P)</div>
-                <div id="chatBox" class="chat-box"><div class="msg ia">Olá! Como posso ajudar de forma privada?</div></div>
-                <div class="chat-input-container"><input type="text" id="chatInput" placeholder="Mensagem..."><button onclick="enviarMensagem()">></button></div>
+                <div id="chatBox" class="chat-box">
+                    <div class="msg ia">Olá! Rede distribuída pronta. Envie um prompt para processarmos de forma fragmentada na malha Mesh.</div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" id="chatInput" placeholder="Pergunte ao supercomputador...">
+                    <button onclick="enviarMensagem()">></button>
+                </div>
             </div>
 
             <script>
@@ -146,13 +153,36 @@ const server = http.createServer(async (req, res) => {
                     fetch(\`/atualizar-no?status=\${statusRede}&cpu=\${document.getElementById('cpuCheck').checked}&mesh=\${document.getElementById('meshCheck').checked}&nodeId=\${meuIdAnonimo}\`);
                 }
 
-                function rodarOtimizador() { document.getElementById('termOtimizar').innerHTML = "> Solicitando nó trabalhador via malha...<br>> Sucesso."; }
-                function simularProcessamento() { document.getElementById('termArquivos').innerHTML = "> Enviando blocos criptográficos para nós anônimos..."; }
-                function enviarMensagem() {
-                    const input = document.getElementById('chatInput'); if(!input.value.trim()) return;
-                    document.getElementById('chatBox').innerHTML += \`<div class="msg user">\${input.value}</div>\`;
+                function rodarOtimizador() { document.getElementById('termOtimizar').innerHTML = "> Solicitando nó trabalhador...<br>> Alocação efetuada."; }
+                function simularProcessamento() { document.getElementById('termArquivos').innerHTML = "> Fatiando arquivo... Enviando blocos..."; }
+                
+                // CHAT DINÂMICO CONECTADO COM A ROTA DO SERVIDOR
+                async function enviarMensagem() {
+                    const input = document.getElementById('chatInput');
+                    const promptText = input.value.trim();
+                    if(!promptText) return;
+                    
+                    const box = document.getElementById('chatBox');
+                    box.innerHTML += \`<div class="msg user">\${promptText}</div>\`;
                     input.value = '';
-                    setTimeout(() => { document.getElementById('chatBox').innerHTML += '<div class="msg ia">Resposta processada em nós ocultos.</div>'; }, 1000);
+                    box.scrollTop = box.scrollHeight;
+
+                    // Exibe carregamento simulando a malha
+                    const loadingId = "load_" + Date.now();
+                    box.innerHTML += \`<div id="\${loadingId}" class="msg ia" style="color: #6c5ce7;">⏳ Dividindo prompt em tokens e distribuindo para nós trabalhadores...</div>\`;
+                    box.scrollTop = box.scrollHeight;
+
+                    try {
+                        const res = await fetch(\`/processar-prompt?prompt=\${encodeURIComponent(promptText)}\`);
+                        const data = await res.json();
+                        
+                        // Remove o texto de carregamento e joga a resposta processada pela infra cega
+                        document.getElementById(loadingId).remove();
+                        box.innerHTML += \`<div class="msg ia"><strong>[Nós consultados: \${data.nosEnvolvidos}]</strong><br>\${data.resposta}</div>\`;
+                    } catch(e) {
+                        document.getElementById(loadingId).innerText = "Erro ao coletar fragmentos de resposta da rede.";
+                    }
+                    box.scrollTop = box.scrollHeight;
                 }
             </script>
         </body>
@@ -169,7 +199,6 @@ const server = http.createServer(async (req, res) => {
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         try {
-            // Salva o nó cego no banco de dados
             await setDoc(doc(db, "rede_mesh", nodeId), {
                 statusDispositivo: status,
                 doandoCPU: cpu,
@@ -177,8 +206,6 @@ const server = http.createServer(async (req, res) => {
                 ultimaInteracao: new Date().toISOString()
             });
 
-            // DISTRIBUIDOR DE TAREFAS CRIPTOGRÁFICAS REAL
-            // Se o nó está ativo e aceitou doar CPU, o servidor gera uma tarefa matemática real de SHA-256 para ele resolver
             let tarefaP2P = null;
             if (status === "Online" && cpu === true) {
                 tarefaP2P = {
@@ -188,16 +215,35 @@ const server = http.createServer(async (req, res) => {
                 };
             }
 
-            // Devolve a resposta com o bloco de trabalho anexado
-            res.end(JSON.stringify({ 
-                status: "Sincronizado", 
-                noIdCego: nodeId,
-                tarefaPendente: tarefaP2P
-            }));
-
+            res.end(JSON.stringify({ status: "Sincronizado", noIdCego: nodeId, tarefaPendente: tarefaP2P }));
         } catch (e) {
             res.end(JSON.stringify({ erro: "Falha na malha: " + e.message }));
         }
+
+    } else if (req.url.startsWith('/processar-prompt')) {
+        // NOVA ROTA BRUTA: Simula a fragmentação e remontagem da inteligência via nós ocultos
+        const urlParams = new URL(req.url, `http://${req.headers.host}`);
+        const prompt = urlParams.searchParams.get('prompt') || '';
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+
+        // Respostas inteligentes baseadas na rede cega
+        let respostaMesh = "Bloco de prompt interpretado na rede cega. Resposta sintetizada com sucesso.";
+        if(prompt.toLowerCase().includes("o que é") || prompt.toLowerCase().includes("oque e")) {
+            respostaMesh = "Eureka é um ecossistema computacional criptográfico P2P que protege a privacidade do tráfego eliminando metadados de identificação centralizados.";
+        } else if(prompt.toLowerCase().includes("status") || prompt.toLowerCase().includes("rede")) {
+            respostaMesh = "Malha Mesh operando de forma saudável. Verificação de integridade distribuída em execução estável.";
+        }
+
+        // Simula o número de aparelhos que ajudaram a descriptografar e processar a resposta
+        const nosSorteados = Math.floor(Math.random() * 8) + 3;
+
+        setTimeout(() => {
+            res.end(JSON.stringify({
+                resposta: respostaMesh,
+                nosEnvolvidos: nosSorteados
+            }));
+        }, 1200); // Pequeno atraso para simular o tempo da malha trabalhando
     } else {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('404 Not Found');
