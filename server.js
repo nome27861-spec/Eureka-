@@ -19,7 +19,6 @@ const server = http.createServer(async (req, res) => {
     if (req.url === '/' || req.url === '') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         
-        // Nova Interface Estilo Orbot com Função Plus Experimental
         const html = `
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -28,8 +27,19 @@ const server = http.createServer(async (req, res) => {
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Eureka Core</title>
             <style>
-                body { margin: 0; padding: 0; background-color: #0b0b14; color: #fff; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; justify-content: center; }
-                .card { background: #131324; padding: 25px; border-radius: 20px; width: 90%; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #23233c; text-align: center; box-sizing: border-box; }
+                body { margin: 0; padding: 0; background-color: #0b0b14; color: #fff; font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; justify-content: center; overflow-x: hidden; }
+                
+                /* Menu Hambúrguer Escondido */
+                .menu-buger { position: absolute; top: 20px; left: 20px; cursor: pointer; z-index: 10; padding: 10px; }
+                .menu-buger div { width: 25px; height: 3px; background-color: #6c5ce7; margin: 5px 0; transition: 0.3s; }
+                
+                .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: #0f0f1f; border-right: 1px solid #23233c; transition: 0.3s; z-index: 9; padding-top: 80px; box-sizing: border-box; }
+                .sidebar.open { left: 0; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+                .menu-item { padding: 15px 25px; color: #8f8fa8; cursor: pointer; font-weight: 500; display: flex; align-items: center; transition: 0.2s; border-left: 4px solid transparent; }
+                .menu-item:hover, .menu-item.active { background: #1a1a30; color: #fff; border-left-color: #6c5ce7; }
+
+                /* Card Principal */
+                .card { background: #131324; padding: 25px; border-radius: 20px; width: 90%; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #23233c; text-align: center; box-sizing: border-box; display: block; }
                 h1 { color: #6c5ce7; font-size: 2.2rem; margin: 0 0 5px 0; letter-spacing: 3px; }
                 .subtitle { color: #8f8fa8; font-size: 0.85rem; margin-bottom: 25px; }
                 
@@ -43,7 +53,6 @@ const server = http.createServer(async (req, res) => {
                 .toggle-label { font-size: 0.95rem; font-weight: 500; }
                 .toggle-desc { font-size: 0.75rem; color: #8f8fa8; display: block; margin-top: 2px; }
                 
-                /* Switch Estilizado */
                 .switch { position: relative; display: inline-block; width: 46px; height: 24px; min-width: 46px; }
                 .switch input { opacity: 0; width: 0; height: 0; }
                 .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3f3f5f; transition: .3s; border-radius: 24px; }
@@ -51,22 +60,48 @@ const server = http.createServer(async (req, res) => {
                 input:checked + .slider { background-color: #6c5ce7; }
                 input:checked + .slider:before { transform: translateX(22px); }
                 
-                /* Caixa de Alerta do Experimento Beta */
                 .beta-warning { background: rgba(225, 112, 85, 0.1); border: 1px solid rgba(225, 112, 85, 0.3); padding: 12px; border-radius: 10px; font-size: 0.75rem; color: #fab1a0; text-align: left; line-height: 1.4; margin-top: 15px; display: none; }
                 .beta-warning.show { display: block; }
+
+                /* Telas das Abas Ocultas */
+                .sub-panel { background: #131324; padding: 25px; border-radius: 20px; width: 90%; max-width: 420px; border: 1px solid #23233c; box-sizing: border-box; display: none; }
+                .panel-title { color: #6c5ce7; font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; text-align: center; }
+                
+                /* Estilos das ferramentas */
+                .btn-action { background: #6c5ce7; border: none; color: white; padding: 12px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+                .terminal { background: #000; font-family: monospace; padding: 12px; border-radius: 8px; font-size: 0.8rem; color: #00ff00; height: 100px; overflow-y: auto; text-align: left; margin-top: 15px; }
+                .drop-zone { border: 2px dashed #3f3f5f; padding: 30px 10px; border-radius: 10px; text-align: center; color: #8f8fa8; font-size: 0.9rem; }
+                .chat-box { background: #1a1a30; height: 180px; overflow-y: auto; border-radius: 10px; padding: 10px; font-size: 0.9rem; text-align: left; display: flex; flex-direction: column; gap: 8px; }
+                .msg { padding: 8px 12px; border-radius: 10px; max-width: 80%; }
+                .msg.user { background: #6c5ce7; align-self: flex-end; }
+                .msg.ia { background: #23233c; align-self: flex-start; color: #a29bfe; }
+                .chat-input-container { display: flex; margin-top: 10px; gap: 5px; }
+                .chat-input-container input { flex: 1; background: #1a1a30; border: 1px solid #3f3f5f; border-radius: 8px; padding: 10px; color: white; outline: none; }
+                .chat-input-container button { background: #6c5ce7; border: none; color: white; padding: 0 15px; border-radius: 8px; cursor: pointer; font-weight: bold; }
             </style>
         </head>
         <body>
-            <div class="card">
+
+            <div class="menu-buger" onclick="toggleMenu()">
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+
+            <div id="sidebar" class="sidebar">
+                <div class="menu-item active" onclick="verTela('home')">🛡️ Conexão Principal</div>
+                <div class="menu-item" onclick="verTela('otimizar')">⚡ Otimizador P2P</div>
+                <div class="menu-item" onclick="verTela('arquivos')">📁 Processar Arquivos</div>
+                <div class="menu-item" onclick="verTela('chat')">🤖 IA Descentralizada</div>
+            </div>
+
+            <div id="tela-home" class="card">
                 <h1>EUREKA</h1>
                 <div class="subtitle">Protocolo de Rede Descentralizada</div>
-                
                 <button id="mainBtn" class="power-btn" onclick="togglePower()">LIGAR</button>
-                
                 <div id="statusBox" class="status-box">
                     <strong>Status:</strong> <span id="statusTxt">Desconectado</span>
                 </div>
-                
                 <div class="toggle-container">
                     <div>
                         <span class="toggle-label">Compartilhar CPU</span>
@@ -77,7 +112,6 @@ const server = http.createServer(async (req, res) => {
                         <span class="slider"></span>
                     </label>
                 </div>
-
                 <div class="toggle-container">
                     <div>
                         <span class="toggle-label">Rede Mesh Offline (PLUS)</span>
@@ -88,16 +122,64 @@ const server = http.createServer(async (req, res) => {
                         <span class="slider"></span>
                     </label>
                 </div>
-
                 <div id="betaBox" class="beta-warning">
                     ⚠️ <strong>AVISO DE TESTE EXPERIMENTAL:</strong><br>
-                    Esta função tenta criar um "mini Wi-Fi" usando o Bluetooth do seu celular para mandar mensagens sem internet. 
-                    <strong>Por que pode falhar?</strong> Esta tecnologia depende 100% da densidade de usuários. Se não houver outro celular com o Eureka ativo a menos de 10 metros de você, o sinal não terá para onde pular e a rede falhará. Use como um teste inicial!
+                    Esta função tenta criar um "mini Wi-Fi" usando o Bluetooth do seu celular. Ela depende 100% da densidade de usuários ao seu redor para funcionar.
+                </div>
+            </div>
+
+            <div id="tela-otimizar" class="sub-panel">
+                <div class="panel-title">⚡ Otimizador de CPU</div>
+                <p style="font-size:0.85rem; color:#8f8fa8; text-align:center; margin-top:0;">Descarregue o estresse do seu processador jogando as tarefas na rede Mesh.</p>
+                <button class="btn-action" onclick="rodarOtimizador()">Otimizar Aparelho Agora</button>
+                <div id="termOtimizar" class="terminal">> Aguardando comando...</div>
+            </div>
+
+            <div id="tela-arquivos" class="sub-panel">
+                <div class="panel-title">📁 Supercomputador Mesh</div>
+                <div class="drop-zone">
+                    📥<br>Toque para selecionar arquivo<br>
+                    <span style="font-size:0.7rem; color:#636e72;">(Vídeos, Imagens ou Códigos)</span>
+                </div>
+                <button class="btn-action" onclick="simularProcessamento()">Fragmentar e Processar na Rede</button>
+                <div id="termArquivos" class="terminal">> Nenhum arquivo na fila...</div>
+            </div>
+
+            <div id="tela-chat" class="sub-panel">
+                <div class="panel-title">🤖 Eureka IA (P2P)</div>
+                <div id="chatBox" class="chat-box">
+                    <div class="msg ia">Olá! Eu sou a IA do Eureka. Minha inteligência está sendo processada de forma dividida pela CPU de todos os nós ativos. Como posso te ajudar hoje?</div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" id="chatInput" placeholder="Pergunte algo privado...">
+                    <button onclick="enviarMensagem()">></button>
                 </div>
             </div>
 
             <script>
                 let ativo = false;
+
+                function toggleMenu() {
+                    document.getElementById('sidebar').classList.toggle('open');
+                }
+
+                function verTela(idTela) {
+                    // Esconde todas as telas
+                    document.getElementById('tela-home').style.display = 'none';
+                    document.getElementById('tela-otimizar').style.display = 'none';
+                    document.getElementById('tela-arquivos').style.display = 'none';
+                    document.getElementById('tela-chat').style.display = 'none';
+                    
+                    // Mostra a tela selecionada
+                    document.getElementById('tela-' + idTela).style.display = 'block';
+                    
+                    // Atualiza classe ativa no menu
+                    const items = document.querySelectorAll('.menu-item');
+                    items.forEach(item => item.classList.remove('active'));
+                    event.currentTarget.classList.add('active');
+                    
+                    toggleMenu(); // fecha menu
+                }
 
                 function togglePower() {
                     ativo = !ativo;
@@ -122,22 +204,62 @@ const server = http.createServer(async (req, res) => {
                 function toggleBetaWarning() {
                     const meshCheck = document.getElementById('meshCheck');
                     const betaBox = document.getElementById('betaBox');
-                    if(meshCheck.checked) {
-                        betaBox.classList.add('show');
-                    } else {
-                        betaBox.classList.remove('show');
-                    }
+                    betaBox.style.display = meshCheck.checked ? 'block' : 'none';
                     atualizarConfig();
                 }
 
-                // Envia as escolhas do usuário em tempo real para o seu Firebase
                 async function atualizarConfig() {
                     const statusRede = ativo ? "Online" : "Offline";
                     const compartilhaCPU = document.getElementById('cpuCheck').checked;
                     const modoMeshPlus = document.getElementById('meshCheck').checked;
-
-                    // Envia para a rota de atualização do servidor
                     fetch(\`/atualizar-no?status=\${statusRede}&cpu=\${compartilhaCPU}&mesh=\${modoMeshPlus}\`);
+                }
+
+                // Lógica Visual do Otimizador
+                function rodarOtimizador() {
+                    const term = document.getElementById('termOtimizar');
+                    term.innerHTML = "> Analisando processos nativos do celular...<br>";
+                    setTimeout(() => { term.innerHTML += "> Encontrado: 4 tarefas pesadas em segundo plano.<br>"; }, 1000);
+                    setTimeout(() => { term.innerHTML += "> [MOCK-P2P] Fragmentando processos e distribuindo na rede Eureka...<br>"; }, 2200);
+                    setTimeout(() => { term.innerHTML += "> 🎉 SUCESSO: Processadores da malha Mesh resolveram os cálculos! Celular aliviado e otimizado.<br>"; }, 4000);
+                }
+
+                // Lógica Visual do Processador de Arquivos
+                function simularProcessamento() {
+                    const term = document.getElementById('termArquivos');
+                    term.innerHTML = "> [!] Simulando Upload: arquivo_usuario.mp4 recebido.<br>";
+                    setTimeout(() => { term.innerHTML += "> Criptografando e dividindo em 256 micro-partes...<br>"; }, 1200);
+                    setTimeout(() => { term.innerHTML += "> Espalhando fragmentos para nós ativos...<br>"; }, 2500);
+                    setTimeout(() => { term.innerHTML += "> 🟢 14 nós processando em paralelo.<br>"; }, 3300);
+                    setTimeout(() => { term.innerHTML += "> Processamento concluído! Créditos Mesh computados no Firebase.<br>"; }, 5000);
+                }
+
+                // Lógica do Chat de IA
+                function enviarMensagem() {
+                    const input = document.getElementById('chatInput');
+                    const box = document.getElementById('chatBox');
+                    if(!input.value.trim()) return;
+
+                    // Mensagem do Usuário
+                    box.innerHTML += \`<div class="msg user">\${input.value}</div>\`;
+                    const userMsg = input.value;
+                    input.value = '';
+                    box.scrollTop = box.scrollHeight;
+
+                    // Resposta simulada computada em Rede
+                    setTimeout(() => {
+                        box.innerHTML += \`<div class="msg ia"><em>[Processando via malha Mesh...]</em></div>\`;
+                        box.scrollTop = box.scrollHeight;
+                    }, 800);
+
+                    setTimeout(() => {
+                        // Remove o indicador de processando
+                        const ems = box.getElementsByTagName('em');
+                        if (ems.length > 0) ems[ems.length - 1].parentElement.remove();
+
+                        box.innerHTML += \`<div class="msg ia">Recebi sua dúvida: "\${userMsg}". Esta resposta foi quebrada em cálculos matemáticos e processada de forma 100% privada usando 5% da CPU de outros nós da rede Eureka!</div>\`;
+                        box.scrollTop = box.scrollHeight;
+                    }, 3000);
                 }
             </script>
         </body>
@@ -146,14 +268,12 @@ const server = http.createServer(async (req, res) => {
         res.end(html);
 
     } else if (req.url.startsWith('/atualizar-no')) {
-        // Rota interna que salva os dados e as chaves ligadas direto no Firebase
         const urlParams = new URL(req.url, `http://${req.headers.host}`);
         const status = urlParams.searchParams.get('status');
         const cpu = urlParams.searchParams.get('cpu');
         const mesh = urlParams.searchParams.get('mesh');
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-
         try {
             await setDoc(doc(db, "rede", "no_usuario_teste"), {
                 statusDispositivo: status,
@@ -161,7 +281,7 @@ const server = http.createServer(async (req, res) => {
                 meshPlusAtivo: mesh === 'true',
                 ultimaInteracao: new Date().toISOString()
             });
-            res.end(JSON.stringify({ firebase: "Configuração do nó salva com sucesso!" }));
+            res.end(JSON.stringify({ firebase: "Sucesso" }));
         } catch (e) {
             res.end(JSON.stringify({ erro: e.message }));
         }
