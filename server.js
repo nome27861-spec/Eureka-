@@ -1,6 +1,6 @@
 const http = require('http');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, setDoc, collection, addDoc, query, where, limit, getDocs, updateDoc } = require('firebase/firestore');
+const { getFirestore, doc, setDoc, collection, addDoc, query, where, limit, getDocs, updateDoc, orderBy } = require('firebase/firestore');
 
 const firebaseConfig = {
   apiKey: "AIzaSyBSgm4PB9FffpqUVEoNU4QgtCxnWCUUBL4",
@@ -19,6 +19,7 @@ const server = http.createServer(async (req, res) => {
     if (req.url === '/' || req.url === '') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         
+        // INTERFACE WEB ATUALIZADA COM MONITOR EM TEMPO REAL
         const html = `
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -64,6 +65,14 @@ const server = http.createServer(async (req, res) => {
                 .chat-input-container input { flex: 1; background: #1a1a30; border: 1px solid #3f3f5f; border-radius: 10px; padding: 12px; color: white; outline: none; }
                 .chat-input-container button { background: #6c5ce7; border: none; color: white; padding: 0 18px; border-radius: 10px; cursor: pointer; font-weight: bold; }
                 .node-info-text { color: #636e72; font-size: 0.75rem; font-family: monospace; margin-top: 15px; }
+                
+                /* ESTILOS DO MONITOR DE BLOCOS */
+                .monitor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin-top: 15px; background: #0b0b14; padding: 10px; border-radius: 8px; border: 1px solid #23233c; }
+                .bloco-status { padding: 6px; font-size: 0.75rem; font-family: monospace; border-radius: 4px; text-align: center; font-weight: bold; }
+                .bloco-status.Pendente { background: #3f3f5f; color: #fff; }
+                .bloco-status.Em { background: #f1c40f; color: #000; }
+                .bloco-status.Concluído { background: #00b894; color: #fff; }
+                .resultado-box { margin-top: 15px; background: #1a1a30; padding: 12px; border-radius: 10px; text-align: left; font-size: 0.9rem; border: 1px solid #6c5ce7; display: none; }
             </style>
         </head>
         <body>
@@ -102,6 +111,17 @@ const server = http.createServer(async (req, res) => {
                 <div class="panel-title">📁 Supercomputador Mesh</div>
                 <textarea id="meshFileInput" class="text-input-mesh" placeholder="Digite ou cole uma string de dados pesada para processar de forma distribuída..."></textarea>
                 <button class="btn-action" onclick="processarArquivoNaMalha()">Fatiar e Processar na Rede</button>
+                
+                <div style="margin-top: 15px; text-align: left; font-size: 0.85rem; color: #8f8fa8;">Status da Malha de Trabalho:</div>
+                <div id="monitorBlocos" class="monitor-grid">
+                    <div style="color:#636e72; grid-column: 1/-1; font-size:0.75rem;">Nenhum arquivo na fila de fragmentação.</div>
+                </div>
+
+                <div id="boxResultadoFinal" class="resultado-box">
+                    <strong style="color: #00b894;">📦 ARQUIVO RECONSTRUÍDO:</strong>
+                    <p id="textoResultadoFinal" style="margin: 5px 0 0 0; word-break: break-all; font-family: monospace;"></p>
+                </div>
+
                 <div id="termArquivos" class="terminal">> Fila vazia. Pronto para fragmentação...</div>
             </div>
 
@@ -115,6 +135,7 @@ const server = http.createServer(async (req, res) => {
                 let ativo = false;
                 let meuIdAnonimo = "web_" + Math.random().toString(36).substring(2, 10);
                 document.getElementById('nodeIdDisplay').innerText = "ID do Nó: hash_" + meuIdAnonimo;
+                let monitorandoFila = false;
 
                 function toggleMenu() { document.getElementById('sidebar').classList.toggle('open'); }
                 function verTela(idTela) {
@@ -159,6 +180,7 @@ const server = http.createServer(async (req, res) => {
                         return;
                     }
 
+                    document.getElementById('boxResultadoFinal').style.display = 'none';
                     term.innerHTML = "> Iniciando fatiador algorítmico...<br>";
                     
                     const tamanhoPedaço = 4;
@@ -180,9 +202,39 @@ const server = http.createServer(async (req, res) => {
                         }
                     }
                     
-                    term.innerHTML += "<span style='color: #00b894;'>✔ Sucesso: Todos os blocos estão na fila de computação da malha.</span>";
+                    term.innerHTML += "<span style='color: #00b894;'>✔ Sucesso: Fila configurada. Monitorando nós de computação...</span>";
                     input.value = '';
                     term.scrollTop = term.scrollHeight;
+
+                    if(!monitorandoFila) {
+                        monitorandoFila = true;
+                        ativarLoopMonitor();
+                    }
+                }
+
+                // LOOP VISUAL: Fica perguntando pro servidor como está o andamento das fatias
+                function activarLoopMonitor() {
+                    setInterval(async () => {
+                        try {
+                            const res = await fetch('/checar-fila');
+                            const dados = await res.json();
+                            
+                            if(dados.lista && dados.lista.length > 0) {
+                                let htmlGrid = '';
+                                dados.lista.forEach(b => {
+                                    let labelStatus = b.status === 'Em Processamento' ? 'Em Proc.' : b.status;
+                                    htmlGrid += \`<div class="bloco-status \${b.status}">B\${b.index}<br><span style="font-size:9px;">\${labelStatus}</span></div>\`;
+                                });
+                                document.getElementById('monitorBlocos').innerHTML = htmlGrid;
+
+                                // Se tudo foi concluído, mostra o texto unificado
+                                if(dados.tudoConcluido && dados.textoCompleto) {
+                                    document.getElementById('textoResultadoFinal').innerText = dados.textoCompleto;
+                                    document.getElementById('boxResultadoFinal').style.display = 'block';
+                                }
+                            }
+                        } catch(e) {}
+                    }, 3000);
                 }
 
                 async function enviarMensagem() {
@@ -259,7 +311,7 @@ const server = http.createServer(async (req, res) => {
     } else if (req.url.startsWith('/enviar-bloco-arquivo')) {
         const urlParams = new URL(req.url, `http://${req.headers.host}`);
         const blocoVal = urlParams.searchParams.get('blocoVal') || '';
-        const blocoIndex = urlParams.searchParams.get('blocoIndex') || '0';
+        const blocoIndex = parseInt(urlParams.searchParams.get('blocoIndex') || '0', 10);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         try {
@@ -275,7 +327,6 @@ const server = http.createServer(async (req, res) => {
         }
 
     } else if (req.url.startsWith('/concluir-tarefa')) {
-        // NOVA ROTA: O celular avisa o servidor que terminou o bloco, o servidor vai ao banco e finaliza o processo.
         const urlParams = new URL(req.url, `http://${req.headers.host}`);
         const idBloco = urlParams.searchParams.get('idBloco') || '';
         const nodeId = urlParams.searchParams.get('nodeId') || '';
@@ -295,6 +346,38 @@ const server = http.createServer(async (req, res) => {
             }
         } catch(e) {
             res.end(JSON.stringify({ erro: e.message }));
+        }
+
+    } else if (req.url.startsWith('/checar-fila')) {
+        // ROTA NOVA: Coleta todos os blocos do Firebase, ordena por índice e verifica se terminou tudo
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        try {
+            const filaRef = collection(db, "fila_computacao");
+            const querySnapshot = await getDocs(filaRef);
+            
+            let blocos = [];
+            querySnapshot.forEach(docSnap => {
+                let d = docSnap.data();
+                blocos.push({
+                    index: d.index,
+                    status: d.statusProcessamento,
+                    conteudo: d.conteudoCripto
+                });
+            });
+
+            // Ordena os blocos pelo índice correto (0, 1, 2...)
+            blocos.sort((a, b) => a.index - b.index);
+
+            let tudoConcluido = blocos.length > 0 && blocos.every(b => b.status === "Concluído");
+            let textoCompleto = "";
+            
+            if(tudoConcluido) {
+                textoCompleto = blocos.map(b => b.conteudo).join("");
+            }
+
+            res.end(JSON.stringify({ lista: blocos, tudoConcluido: tudoConcluido, textoCompleto: textoCompleto }));
+        } catch(e) {
+            res.end(JSON.stringify({ erro: e.message, lista: [] }));
         }
 
     } else if (req.url.startsWith('/processar-prompt')) {
