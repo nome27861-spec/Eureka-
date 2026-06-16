@@ -19,7 +19,6 @@ const server = http.createServer(async (req, res) => {
     if (req.url === '/' || req.url === '') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         
-        // INTERFACE WEB (Mantida idêntica à versão anterior)
         const html = `
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -222,7 +221,6 @@ const server = http.createServer(async (req, res) => {
                 ultimaInteracao: new Date().toISOString()
             });
 
-            // O MESTRE DE OBRAS REAL: Busca blocos pendentes reais no Firebase
             let tarefaP2P = null;
             if (status === "Online" && cpu === true) {
                 const filaRef = collection(db, "fila_computacao");
@@ -240,13 +238,11 @@ const server = http.createServer(async (req, res) => {
                         seedMatematica: dadosBloco.conteudoCripto
                     };
 
-                    // Atualiza o banco dizendo que este bloco já tem um trabalhador
                     await updateDoc(docSnap.ref, {
                         statusProcessamento: "Em Processamento",
                         noAtribuido: nodeId
                     });
                 } else {
-                    // Se a fila estiver vazia, manda um bloco fictício para o nó não dormir
                     tarefaP2P = {
                         tipo: "IDLE_MINING_BLOCK",
                         dificuldade: "5000_LOOPS",
@@ -275,6 +271,29 @@ const server = http.createServer(async (req, res) => {
             });
             res.end(JSON.stringify({ status: "Bloco Alocado", index: blocoIndex }));
         } catch (e) {
+            res.end(JSON.stringify({ erro: e.message }));
+        }
+
+    } else if (req.url.startsWith('/concluir-tarefa')) {
+        // NOVA ROTA: O celular avisa o servidor que terminou o bloco, o servidor vai ao banco e finaliza o processo.
+        const urlParams = new URL(req.url, `http://${req.headers.host}`);
+        const idBloco = urlParams.searchParams.get('idBloco') || '';
+        const nodeId = urlParams.searchParams.get('nodeId') || '';
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        try {
+            if (idBloco) {
+                const docRef = doc(db, "fila_computacao", idBloco);
+                await updateDoc(docRef, {
+                    statusProcessamento: "Concluído",
+                    finalizadoPor: nodeId,
+                    dataConclusao: new Date().toISOString()
+                });
+                res.end(JSON.stringify({ status: "Sucesso", mensagem: "Bloco finalizado na nuvem." }));
+            } else {
+                res.end(JSON.stringify({ erro: "ID do bloco inválido" }));
+            }
+        } catch(e) {
             res.end(JSON.stringify({ erro: e.message }));
         }
 
