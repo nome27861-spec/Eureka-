@@ -1,6 +1,6 @@
 const http = require('http');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, setDoc, collection, addDoc } = require('firebase/firestore');
+const { getFirestore, doc, setDoc, collection, addDoc, query, where, limit, getDocs, updateDoc } = require('firebase/firestore');
 
 const firebaseConfig = {
   apiKey: "AIzaSyBSgm4PB9FffpqUVEoNU4QgtCxnWCUUBL4",
@@ -19,6 +19,7 @@ const server = http.createServer(async (req, res) => {
     if (req.url === '/' || req.url === '') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         
+        // INTERFACE WEB (Mantida idêntica à versão anterior)
         const html = `
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -149,7 +150,6 @@ const server = http.createServer(async (req, res) => {
 
                 function rodarOtimizador() { document.getElementById('termOtimizar').innerHTML = "> Solicitando nó trabalhador...<br>> Alocação efetuada."; }
                 
-                // INTEGRAÇÃO DO FATIADOR REAL DE ARQUIVOS
                 async function processarArquivoNaMalha() {
                     const input = document.getElementById('meshFileInput');
                     const textoTodo = input.value.trim();
@@ -162,7 +162,6 @@ const server = http.createServer(async (req, res) => {
 
                     term.innerHTML = "> Iniciando fatiador algorítmico...<br>";
                     
-                    // Quebra o texto inserido em pedaços de 4 caracteres para simular fragmentação real
                     const tamanhoPedaço = 4;
                     let blocos = [];
                     for (let i = 0; i < textoTodo.length; i += tamanhoPedaço) {
@@ -171,7 +170,6 @@ const server = http.createServer(async (req, res) => {
 
                     term.innerHTML += \`> Dados fatiados em \${blocos.length} blocos distintos.<br>\`;
                     
-                    // Dispara cada fatia de forma assíncrona para a nova rota do servidor
                     for(let index = 0; index < blocos.length; index++) {
                         term.innerHTML += \`> Enviando bloco [\${index}] -> Valor: "\${blocos[index]}"<br>\`;
                         term.scrollTop = term.scrollHeight;
@@ -224,28 +222,51 @@ const server = http.createServer(async (req, res) => {
                 ultimaInteracao: new Date().toISOString()
             });
 
+            // O MESTRE DE OBRAS REAL: Busca blocos pendentes reais no Firebase
             let tarefaP2P = null;
             if (status === "Online" && cpu === true) {
-                tarefaP2P = {
-                    tipo: "HASH_MINING_BLOCK",
-                    dificuldade: "5000_LOOPS",
-                    seedMatematica: "eureka_block_token_" + Math.random().toString(36).substring(2, 7)
-                };
+                const filaRef = collection(db, "fila_computacao");
+                const q = query(filaRef, where("statusProcessamento", "==", "Pendente"), limit(1));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    const docSnap = querySnapshot.docs[0];
+                    const dadosBloco = docSnap.data();
+                    
+                    tarefaP2P = {
+                        idBloco: docSnap.id,
+                        tipo: "REAL_DATA_BLOCK",
+                        dificuldade: "5000_LOOPS",
+                        seedMatematica: dadosBloco.conteudoCripto
+                    };
+
+                    // Atualiza o banco dizendo que este bloco já tem um trabalhador
+                    await updateDoc(docSnap.ref, {
+                        statusProcessamento: "Em Processamento",
+                        noAtribuido: nodeId
+                    });
+                } else {
+                    // Se a fila estiver vazia, manda um bloco fictício para o nó não dormir
+                    tarefaP2P = {
+                        tipo: "IDLE_MINING_BLOCK",
+                        dificuldade: "5000_LOOPS",
+                        seedMatematica: "eureka_idle_" + Math.random().toString(36).substring(2, 7)
+                    };
+                }
             }
+            
             res.end(JSON.stringify({ status: "Sincronizado", noIdCego: nodeId, tarefaPendente: tarefaP2P }));
         } catch (e) {
             res.end(JSON.stringify({ erro: "Falha: " + e.message }));
         }
 
     } else if (req.url.startsWith('/enviar-bloco-arquivo')) {
-        // ROTA DO SUPERCOMPUTADOR: Recebe fragmentos e injeta na fila de tarefas do banco de dados
         const urlParams = new URL(req.url, `http://${req.headers.host}`);
         const blocoVal = urlParams.searchParams.get('blocoVal') || '';
         const blocoIndex = urlParams.searchParams.get('blocoIndex') || '0';
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         try {
-            // Insere o fragmento do arquivo na coleção global de tarefas para os aplicativos pescarem
             await addDoc(collection(db, "fila_computacao"), {
                 index: blocoIndex,
                 conteudoCripto: blocoVal,
