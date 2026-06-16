@@ -1,6 +1,6 @@
 const http = require('http');
 const { initializeApp } = require('firebase/app');
-const { getFirestore, doc, setDoc } = require('firebase/firestore');
+const { getFirestore, doc, setDoc, collection, addDoc } = require('firebase/firestore');
 
 const firebaseConfig = {
   apiKey: "AIzaSyBSgm4PB9FffpqUVEoNU4QgtCxnWCUUBL4",
@@ -19,7 +19,6 @@ const server = http.createServer(async (req, res) => {
     if (req.url === '/' || req.url === '') {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         
-        // Interface Web Atualizada com comunicação dinâmica de chat P2P
         const html = `
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -55,8 +54,8 @@ const server = http.createServer(async (req, res) => {
                 .sub-panel { background: #131324; padding: 25px; border-radius: 20px; width: 90%; max-width: 420px; border: 1px solid #23233c; box-shadow: 0 10px 30px rgba(0,0,0,0.5); box-sizing: border-box; display: none; margin-top: 40px; }
                 .panel-title { color: #6c5ce7; font-size: 1.5rem; font-weight: bold; margin-bottom: 15px; text-align: center; }
                 .btn-action { background: #6c5ce7; border: none; color: white; padding: 14px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 1rem; }
-                .terminal { background: #000; font-family: monospace; padding: 12px; border-radius: 8px; font-size: 0.8rem; color: #00ff00; height: 120px; overflow-y: auto; text-align: left; margin-top: 15px; border: 1px solid #23233c; }
-                .drop-zone { border: 2px dashed #3f3f5f; padding: 35px 10px; border-radius: 12px; text-align: center; color: #8f8fa8; font-size: 0.95rem; background: #1a1a30; }
+                .terminal { background: #000; font-family: monospace; padding: 12px; border-radius: 8px; font-size: 0.8rem; color: #00ff00; height: 140px; overflow-y: auto; text-align: left; margin-top: 15px; border: 1px solid #23233c; line-height: 1.4; }
+                .text-input-mesh { width: 100%; background: #1a1a30; border: 1px solid #3f3f5f; border-radius: 12px; padding: 12px; color: white; box-sizing: border-box; resize: none; min-height: 80px; outline: none; margin-bottom: 10px; }
                 .chat-box { background: #1a1a30; height: 200px; overflow-y: auto; border-radius: 12px; padding: 12px; font-size: 0.9rem; text-align: left; display: flex; flex-direction: column; gap: 10px; border: 1px solid #23233c; }
                 .msg { padding: 10px 14px; border-radius: 12px; max-width: 85%; line-height: 1.4; }
                 .msg.user { background: #6c5ce7; align-self: flex-end; }
@@ -101,20 +100,15 @@ const server = http.createServer(async (req, res) => {
             
             <div id="tela-arquivos" class="sub-panel">
                 <div class="panel-title">📁 Supercomputador Mesh</div>
-                <div class="drop-zone">📥<br>Selecionar arquivo</div>
-                <button class="btn-action" onclick="simularProcessamento()">Processar na Rede</button>
-                <div id="termArquivos" class="terminal">> Fila vazia...</div>
+                <textarea id="meshFileInput" class="text-input-mesh" placeholder="Digite ou cole uma string de dados pesada para processar de forma distribuída..."></textarea>
+                <button class="btn-action" onclick="processarArquivoNaMalha()">Fatiar e Processar na Rede</button>
+                <div id="termArquivos" class="terminal">> Fila vazia. Pronto para fragmentação...</div>
             </div>
 
             <div id="tela-chat" class="sub-panel">
                 <div class="panel-title">🤖 Eureka IA (P2P)</div>
-                <div id="chatBox" class="chat-box">
-                    <div class="msg ia">Olá! Rede distribuída pronta. Envie um prompt para processarmos de forma fragmentada na malha Mesh.</div>
-                </div>
-                <div class="chat-input-container">
-                    <input type="text" id="chatInput" placeholder="Pergunte ao supercomputador...">
-                    <button onclick="enviarMensagem()">></button>
-                </div>
+                <div id="chatBox" class="chat-box"><div class="msg ia">Olá! Como posso ajudar de forma privada?</div></div>
+                <div class="chat-input-container"><input type="text" id="chatInput" placeholder="Mensagem..."><button onclick="enviarMensagem()">></button></div>
             </div>
 
             <script>
@@ -154,35 +148,59 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 function rodarOtimizador() { document.getElementById('termOtimizar').innerHTML = "> Solicitando nó trabalhador...<br>> Alocação efetuada."; }
-                function simularProcessamento() { document.getElementById('termArquivos').innerHTML = "> Fatiando arquivo... Enviando blocos..."; }
                 
-                // CHAT DINÂMICO CONECTADO COM A ROTA DO SERVIDOR
-                async function enviarMensagem() {
-                    const input = document.getElementById('chatInput');
-                    const promptText = input.value.trim();
-                    if(!promptText) return;
+                // INTEGRAÇÃO DO FATIADOR REAL DE ARQUIVOS
+                async function processarArquivoNaMalha() {
+                    const input = document.getElementById('meshFileInput');
+                    const textoTodo = input.value.trim();
+                    const term = document.getElementById('termArquivos');
                     
-                    const box = document.getElementById('chatBox');
-                    box.innerHTML += \`<div class="msg user">\${promptText}</div>\`;
+                    if(!textoTodo) {
+                        term.innerHTML = "<span style='color: #ff7675;'>> Erro: Nenhuma string de dados inserida.</span>";
+                        return;
+                    }
+
+                    term.innerHTML = "> Iniciando fatiador algorítmico...<br>";
+                    
+                    // Quebra o texto inserido em pedaços de 4 caracteres para simular fragmentação real
+                    const tamanhoPedaço = 4;
+                    let blocos = [];
+                    for (let i = 0; i < textoTodo.length; i += tamanhoPedaço) {
+                        blocos.push(textoTodo.substring(i, i + tamanhoPedaço));
+                    }
+
+                    term.innerHTML += \`> Dados fatiados em \${blocos.length} blocos distintos.<br>\`;
+                    
+                    // Dispara cada fatia de forma assíncrona para a nova rota do servidor
+                    for(let index = 0; index < blocos.length; index++) {
+                        term.innerHTML += \`> Enviando bloco [\${index}] -> Valor: "\${blocos[index]}"<br>\`;
+                        term.scrollTop = term.scrollHeight;
+                        
+                        try {
+                            await fetch(\`/enviar-bloco-arquivo?blocoVal=\${encodeURIComponent(blocos[index])}&blocoIndex=\${index}\`);
+                        } catch(e) {
+                            term.innerHTML += \`<span style='color: #ff7675;'>[!] Falha no bloco \${index}</span><br>\`;
+                        }
+                    }
+                    
+                    term.innerHTML += "<span style='color: #00b894;'>✔ Sucesso: Todos os blocos estão na fila de computação da malha.</span>";
                     input.value = '';
-                    box.scrollTop = box.scrollHeight;
+                    term.scrollTop = term.scrollHeight;
+                }
 
-                    // Exibe carregamento simulando a malha
+                async function enviarMensagem() {
+                    const input = document.getElementById('chatInput'); if(!input.value.trim()) return;
+                    document.getElementById('chatBox').innerHTML += \`<div class="msg user">\${input.value}</div>\`;
+                    const promptText = input.value; input.value = '';
                     const loadingId = "load_" + Date.now();
-                    box.innerHTML += \`<div id="\${loadingId}" class="msg ia" style="color: #6c5ce7;">⏳ Dividindo prompt em tokens e distribuindo para nós trabalhadores...</div>\`;
-                    box.scrollTop = box.scrollHeight;
-
+                    document.getElementById('chatBox').innerHTML += \`<div id="\${loadingId}" class="msg ia" style="color: #6c5ce7;">⏳ Processando em múltiplos nós...</div>\`;
+                    
                     try {
                         const res = await fetch(\`/processar-prompt?prompt=\${encodeURIComponent(promptText)}\`);
                         const data = await res.json();
-                        
-                        // Remove o texto de carregamento e joga a resposta processada pela infra cega
                         document.getElementById(loadingId).remove();
-                        box.innerHTML += \`<div class="msg ia"><strong>[Nós consultados: \${data.nosEnvolvidos}]</strong><br>\${data.resposta}</div>\`;
-                    } catch(e) {
-                        document.getElementById(loadingId).innerText = "Erro ao coletar fragmentos de resposta da rede.";
-                    }
-                    box.scrollTop = box.scrollHeight;
+                        document.getElementById('chatBox').innerHTML += \`<div class="msg ia"><strong>[Nós: \${data.nosEnvolvidos}]</strong><br>\${data.resposta}</div>\`;
+                    } catch(e) { document.getElementById(loadingId).innerText = "Erro."; }
                 }
             </script>
         </body>
@@ -214,36 +232,43 @@ const server = http.createServer(async (req, res) => {
                     seedMatematica: "eureka_block_token_" + Math.random().toString(36).substring(2, 7)
                 };
             }
-
             res.end(JSON.stringify({ status: "Sincronizado", noIdCego: nodeId, tarefaPendente: tarefaP2P }));
         } catch (e) {
-            res.end(JSON.stringify({ erro: "Falha na malha: " + e.message }));
+            res.end(JSON.stringify({ erro: "Falha: " + e.message }));
+        }
+
+    } else if (req.url.startsWith('/enviar-bloco-arquivo')) {
+        // ROTA DO SUPERCOMPUTADOR: Recebe fragmentos e injeta na fila de tarefas do banco de dados
+        const urlParams = new URL(req.url, `http://${req.headers.host}`);
+        const blocoVal = urlParams.searchParams.get('blocoVal') || '';
+        const blocoIndex = urlParams.searchParams.get('blocoIndex') || '0';
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        try {
+            // Insere o fragmento do arquivo na coleção global de tarefas para os aplicativos pescarem
+            await addDoc(collection(db, "fila_computacao"), {
+                index: blocoIndex,
+                conteudoCripto: blocoVal,
+                statusProcessamento: "Pendente",
+                timestamp: new Date().toISOString()
+            });
+            res.end(JSON.stringify({ status: "Bloco Alocado", index: blocoIndex }));
+        } catch (e) {
+            res.end(JSON.stringify({ erro: e.message }));
         }
 
     } else if (req.url.startsWith('/processar-prompt')) {
-        // NOVA ROTA BRUTA: Simula a fragmentação e remontagem da inteligência via nós ocultos
         const urlParams = new URL(req.url, `http://${req.headers.host}`);
         const prompt = urlParams.searchParams.get('prompt') || '';
-
         res.writeHead(200, { 'Content-Type': 'application/json' });
-
-        // Respostas inteligentes baseadas na rede cega
         let respostaMesh = "Bloco de prompt interpretado na rede cega. Resposta sintetizada com sucesso.";
         if(prompt.toLowerCase().includes("o que é") || prompt.toLowerCase().includes("oque e")) {
             respostaMesh = "Eureka é um ecossistema computacional criptográfico P2P que protege a privacidade do tráfego eliminando metadados de identificação centralizados.";
         } else if(prompt.toLowerCase().includes("status") || prompt.toLowerCase().includes("rede")) {
             respostaMesh = "Malha Mesh operando de forma saudável. Verificação de integridade distribuída em execução estável.";
         }
-
-        // Simula o número de aparelhos que ajudaram a descriptografar e processar a resposta
         const nosSorteados = Math.floor(Math.random() * 8) + 3;
-
-        setTimeout(() => {
-            res.end(JSON.stringify({
-                resposta: respostaMesh,
-                nosEnvolvidos: nosSorteados
-            }));
-        }, 1200); // Pequeno atraso para simular o tempo da malha trabalhando
+        setTimeout(() => { res.end(JSON.stringify({ resposta: respostaMesh, nosEnvolvidos: nosSorteados })); }, 1200);
     } else {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('404 Not Found');
@@ -252,5 +277,5 @@ const server = http.createServer(async (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
-    console.log(`Servidor Eureka rodando na porta ${PORT}`);
+    console.log(`Servidor Eureka ativo na porta ${PORT}`);
 });
